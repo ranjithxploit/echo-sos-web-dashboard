@@ -5,6 +5,7 @@ import { bleDevices } from "./schema";
 
 const seedRows = [
   {
+    bleId: "BLE-1001",
     locationOfMobile: "Baker Street",
     phoneId: "MOB-1001",
     capturedAt: new Date("2026-04-01T08:15:00Z"),
@@ -13,6 +14,7 @@ const seedRows = [
     longitude: -0.09,
   },
   {
+    bleId: "BLE-1002",
     locationOfMobile: "Oxford Street",
     phoneId: "MOB-1002",
     capturedAt: new Date("2026-04-01T08:16:20Z"),
@@ -21,6 +23,7 @@ const seedRows = [
     longitude: -0.0892,
   },
   {
+    bleId: "BLE-1003",
     locationOfMobile: "Regent Street",
     phoneId: "MOB-1003",
     capturedAt: new Date("2026-04-01T08:17:10Z"),
@@ -29,6 +32,7 @@ const seedRows = [
     longitude: -0.0904,
   },
   {
+    bleId: "BLE-1004",
     locationOfMobile: "King Street",
     phoneId: "MOB-1004",
     capturedAt: new Date("2026-04-01T08:18:45Z"),

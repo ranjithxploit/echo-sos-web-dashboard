@@ -31,6 +31,7 @@ export const bleDevices = sqliteTable(
   "ble_device",
   (d) => ({
     id: d.integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
+    bleId: d.text({ length: 255 }).notNull(),
     locationOfMobile: d.text({ length: 255 }).notNull(),
     phoneId: d.text({ length: 255 }).notNull(),
     capturedAt: d.integer({ mode: "timestamp" }).notNull(),
@@ -38,7 +39,10 @@ export const bleDevices = sqliteTable(
     latitude: d.real().notNull(),
     longitude: d.real().notNull(),
   }),
-  (t) => [index("ble_device_phone_id_idx").on(t.phoneId)],
+  (t) => [
+    index("ble_device_ble_id_idx").on(t.bleId),
+    index("ble_device_phone_id_idx").on(t.phoneId),
+  ],
 );
 
 // Better Auth core tables

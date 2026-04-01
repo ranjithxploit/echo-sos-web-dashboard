@@ -2,6 +2,7 @@
 
 import type { FC } from "react";
 
+import { ThemeToggle } from "~/components/application/theme-toggle";
 import type { NavItemType } from "../config";
 import { NavList } from "../base-components/nav-list";
 
@@ -12,7 +13,13 @@ type SidebarNavigationDualTierProps = {
 export const SidebarNavigationDualTier = ({
   items,
 }: SidebarNavigationDualTierProps) => (
-  <aside className="min-h-dvh border-r border-slate-200 bg-white text-slate-950 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-50">
-    <NavList items={items} className="px-3 pt-3" />
+  <aside className="border-border bg-background text-foreground min-h-dvh border-r">
+    <div className="flex min-h-dvh flex-col">
+      <NavList items={items} className="px-3 pt-3" />
+
+      <div className="border-border mt-auto border-t p-3">
+        <ThemeToggle className="w-full justify-center" />
+      </div>
+    </div>
   </aside>
 );

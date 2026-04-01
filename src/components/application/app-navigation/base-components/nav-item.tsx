@@ -7,8 +7,8 @@ import { Badge } from "~/components/base/badges/badges";
 import { cx, sortCx } from "~/lib/utils/cx";
 
 const styles = sortCx({
-  root: "group relative flex min-h-12 w-full cursor-pointer items-center rounded-xl border border-slate-200 bg-white outline-focus-ring transition duration-100 ease-linear select-none hover:bg-slate-50 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800",
-  rootSelected: "border-blue-600 bg-blue-600 hover:bg-blue-600",
+  root: "group relative flex min-h-12 w-full cursor-pointer items-center rounded-xl border border-border bg-background outline-focus-ring transition duration-100 ease-linear select-none hover:bg-muted focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2",
+  rootSelected: "border-primary bg-primary hover:bg-primary",
 });
 
 interface NavItemBaseProps {
@@ -48,8 +48,8 @@ export const NavItemBase = ({
     <Icon
       aria-hidden="true"
       className={cx(
-        "transition-inherit-all mr-3 size-5 shrink-0 text-slate-500 group-hover/item:text-slate-700 dark:text-slate-400 dark:group-hover/item:text-slate-200",
-        current && "text-white",
+        "transition-inherit-all text-muted-foreground group-hover/item:text-foreground mr-3 size-5 shrink-0",
+        current && "text-primary-foreground",
       )}
     />
   );
@@ -66,7 +66,7 @@ export const NavItemBase = ({
   const labelElement = (
     <span
       className={cx(
-        "transition-inherit-all flex-1 text-[0.95rem] font-semibold text-slate-800 group-hover/item:text-slate-950 dark:text-slate-100 dark:group-hover/item:text-white",
+        "transition-inherit-all text-foreground group-hover/item:text-foreground flex-1 text-[0.95rem] font-semibold",
         truncate && "truncate",
         current && "text-white",
       )}
@@ -77,7 +77,7 @@ export const NavItemBase = ({
 
   const isExternal = href?.startsWith("http");
   const externalIcon = isExternal && (
-    <Share04 className="text-fg-quaternary size-4 stroke-[2.5px]" />
+    <Share04 className="text-muted-foreground size-4 stroke-[2.5px]" />
   );
 
   if (type === "collapsible") {
@@ -94,7 +94,7 @@ export const NavItemBase = ({
 
         <ChevronDown
           aria-hidden="true"
-          className="ml-3 size-4 shrink-0 stroke-[2.5px] text-slate-500 group-hover/item:text-slate-700 in-open:-scale-y-100 dark:text-slate-400 dark:group-hover/item:text-slate-200"
+          className="text-muted-foreground group-hover/item:text-foreground ml-3 size-4 shrink-0 stroke-[2.5px] in-open:-scale-y-100"
         />
       </summary>
     );
