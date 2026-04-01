@@ -6,9 +6,9 @@ const ensureBleDeviceTable = sql`
   CREATE TABLE IF NOT EXISTS ble_device (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bleId TEXT NOT NULL,
-    locationOfMobile TEXT NOT NULL,
     phoneId TEXT NOT NULL,
     capturedAt INTEGER NOT NULL,
+    accuracy REAL NOT NULL,
     strength INTEGER NOT NULL,
     latitude REAL NOT NULL,
     longitude REAL NOT NULL

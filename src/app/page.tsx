@@ -28,9 +28,9 @@ type View = "map" | "table";
 type BleDevice = {
   id: number;
   bleId: string;
-  locationOfMobile: string;
   phoneId: string;
   capturedAt: Date;
+  accuracy: number;
   strength: number;
   latitude: number;
   longitude: number;
@@ -94,6 +94,7 @@ function BleDetails({ reports }: { reports: BleDevice[] }) {
   }
 
   const [latestReport] = reports as [BleDevice, ...BleDevice[]];
+  const sortedReports = [...reports].sort((a, b) => a.accuracy - b.accuracy);
 
   const getReportTone = (index: number, total: number) => {
     if (total <= 1) {
@@ -115,7 +116,11 @@ function BleDetails({ reports }: { reports: BleDevice[] }) {
         <span className="font-semibold">{latestReport.bleId}</span>
         <span className="text-muted-foreground">{latestReport.phoneId}</span>
         <span className="text-muted-foreground">
-          {latestReport.locationOfMobile}
+          {latestReport.latitude.toFixed(4)},{" "}
+          {latestReport.longitude.toFixed(4)}
+        </span>
+        <span className="text-muted-foreground">
+          {latestReport.accuracy.toFixed(1)} m
         </span>
         <span className="text-muted-foreground">
           {new Date(latestReport.capturedAt).toLocaleString()}
@@ -130,13 +135,13 @@ function BleDetails({ reports }: { reports: BleDevice[] }) {
       </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1">
-        {reports.map((report, index) => (
+        {sortedReports.map((report, index) => (
           <span
             key={report.id}
             className={`rounded-full px-2 py-1 ${getReportTone(index, reports.length)}`}
           >
-            {report.locationOfMobile} ·{" "}
-            {new Date(report.capturedAt).toLocaleDateString()}
+            {report.latitude.toFixed(4)}, {report.longitude.toFixed(4)} ·{" "}
+            {report.accuracy.toFixed(1)} m
           </span>
         ))}
       </div>
@@ -239,8 +244,8 @@ function MapPanel({
 
         marker.bindTooltip(
           `
-            <div class="ble-tooltip__place">${device.locationOfMobile}</div>
             <div class="ble-tooltip__coords">${device.latitude.toFixed(4)}, ${device.longitude.toFixed(4)}</div>
+            <div class="ble-tooltip__coords">Accuracy ${device.accuracy.toFixed(1)} m</div>
             <div class="ble-tooltip__strength ble-tooltip__strength--${isStrong ? "strong" : "weak"}">
               Strength ${device.strength} dBm
             </div>
@@ -430,7 +435,11 @@ export default function Home() {
     () => [
       { accessorKey: "bleId", header: "BLE ID" },
       { accessorKey: "phoneId", header: "Phone ID" },
-      { accessorKey: "locationOfMobile", header: "Location of the Mobile" },
+      {
+        accessorKey: "accuracy",
+        header: "Accuracy",
+        cell: ({ getValue }) => `${Number(getValue<number>()).toFixed(1)} m`,
+      },
       {
         accessorKey: "capturedAt",
         header: "Time",

@@ -32,9 +32,9 @@ export const bleDevices = sqliteTable(
   (d) => ({
     id: d.integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
     bleId: d.text({ length: 255 }).notNull(),
-    locationOfMobile: d.text({ length: 255 }).notNull(),
     phoneId: d.text({ length: 255 }).notNull(),
     capturedAt: d.integer({ mode: "timestamp" }).notNull(),
+    accuracy: d.real().notNull(),
     strength: d.integer().notNull(),
     latitude: d.real().notNull(),
     longitude: d.real().notNull(),
