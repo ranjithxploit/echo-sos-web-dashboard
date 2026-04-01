@@ -326,14 +326,14 @@ function MapPanel({ devices }: { devices: BleDevice[] }) {
 
 export default function Home() {
   const [view, setView] = useState<View>("map");
+  const [selectedBleFromUrl, setSelectedBleFromUrl] = useState("");
 
   useEffect(() => {
     const syncView = () => {
-      setView(
-        new URL(window.location.href).searchParams.get("view") === "table"
-          ? "table"
-          : "map",
-      );
+      const params = new URL(window.location.href).searchParams;
+
+      setView(params.get("view") === "table" ? "table" : "map");
+      setSelectedBleFromUrl(params.get("ble") ?? "");
     };
 
     syncView();
@@ -364,6 +364,22 @@ export default function Home() {
         cell: ({ getValue }) => new Date(getValue<Date>()).toLocaleString(),
       },
       { accessorKey: "strength", header: "Strength" },
+      {
+        id: "navigate",
+        header: "",
+        cell: ({ row }) => (
+          <button
+            type="button"
+            onClick={() => {
+              window.localStorage.setItem("selectedBleId", row.original.bleId);
+              window.location.href = "/?view=map";
+            }}
+            className="bg-primary text-primary-foreground hover:bg-primary_hover inline-flex h-8 items-center rounded-lg px-3 text-xs font-semibold"
+          >
+            Navigate
+          </button>
+        ),
+      },
     ],
     [],
   );
@@ -382,6 +398,16 @@ export default function Home() {
   const selectedDevicesForMap = activePhoneId
     ? devices.filter((device) => device.bleId === activePhoneId)
     : devices;
+
+  useEffect(() => {
+    const selectedBleId = window.localStorage.getItem("selectedBleId");
+
+    if (selectedBleId) {
+      setActivePhoneId(selectedBleId);
+      setSelectedPhoneId(selectedBleId);
+      window.localStorage.removeItem("selectedBleId");
+    }
+  }, [selectedBleFromUrl]);
 
   return (
     <main className="bg-background text-foreground min-h-dvh">
