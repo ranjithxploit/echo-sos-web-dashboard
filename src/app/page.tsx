@@ -8,6 +8,7 @@ import type {
   Map as LeafletMap,
   Layer as LeafletLayer,
   Marker as LeafletMarker,
+  Polyline as LeafletPolyline,
 } from "leaflet";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -143,13 +144,25 @@ function BleDetails({ reports }: { reports: BleDevice[] }) {
   );
 }
 
-function MapPanel({ devices }: { devices: BleDevice[] }) {
+function MapPanel({
+  devices,
+  isRouteVisible,
+  hasRoute,
+  onToggleRoute,
+}: {
+  devices: BleDevice[];
+  isRouteVisible: boolean;
+  hasRoute: boolean;
+  onToggleRoute: () => void;
+}) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
   const lightBaseLayerRef = useRef<LeafletLayer | null>(null);
   const lightLabelLayerRef = useRef<LeafletLayer | null>(null);
   const satelliteLayerRef = useRef<LeafletLayer | null>(null);
   const markersRef = useRef<LeafletMarker[]>([]);
+  const routeRef = useRef<LeafletPolyline | null>(null);
+  const routeIndexMarkersRef = useRef<LeafletMarker[]>([]);
   const [isSatellite, setIsSatellite] = useState(false);
 
   useEffect(() => {
@@ -244,6 +257,52 @@ function MapPanel({ devices }: { devices: BleDevice[] }) {
         return marker;
       });
 
+      routeRef.current?.remove();
+      routeRef.current = null;
+      routeIndexMarkersRef.current.forEach((marker) => marker.remove());
+      routeIndexMarkersRef.current = [];
+
+      if (isRouteVisible && devices.length > 1) {
+        const routePoints = [...devices]
+          .sort(
+            (a, b) =>
+              new Date(a.capturedAt).getTime() -
+              new Date(b.capturedAt).getTime(),
+          )
+          .map(
+            (device) => [device.latitude, device.longitude] as [number, number],
+          );
+
+        routeRef.current = L.polyline(routePoints, {
+          color: "#ef4444",
+          weight: 4,
+          opacity: 0.8,
+          dashArray: "6 10",
+        }).addTo(map);
+
+        routeIndexMarkersRef.current = routePoints
+          .slice(0, -1)
+          .map((point, index) => {
+            const nextPoint = routePoints[index + 1]!;
+            const midpoint: [number, number] = [
+              (point[0] + nextPoint[0]) / 2,
+              (point[1] + nextPoint[1]) / 2,
+            ];
+
+            const indexMarker = L.marker(midpoint, {
+              icon: L.divIcon({
+                className: "ble-route-index-marker",
+                html: `<span>${index + 1}</span>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+              }),
+              interactive: false,
+            }).addTo(map);
+
+            return indexMarker;
+          });
+      }
+
       if (devices.length > 0) {
         const bounds = L.latLngBounds(
           devices.map(
@@ -271,6 +330,10 @@ function MapPanel({ devices }: { devices: BleDevice[] }) {
       cancelled = true;
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = [];
+      routeRef.current?.remove();
+      routeRef.current = null;
+      routeIndexMarkersRef.current.forEach((marker) => marker.remove());
+      routeIndexMarkersRef.current = [];
       mapInstanceRef.current?.remove();
       mapInstanceRef.current = null;
 
@@ -278,7 +341,7 @@ function MapPanel({ devices }: { devices: BleDevice[] }) {
         container.innerHTML = "";
       }
     };
-  }, [devices]);
+  }, [devices, isRouteVisible]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -320,20 +383,28 @@ function MapPanel({ devices }: { devices: BleDevice[] }) {
           {isSatellite ? "Map view" : "Satellite"}
         </AriaButton>
       </div>
+
+      {hasRoute && (
+        <div className="absolute top-3 right-3 z-[500]">
+          <AriaButton
+            onPress={onToggleRoute}
+            className="bg-primary text-primary-foreground hover:bg-primary_hover rounded-full px-4 py-2 text-xs font-semibold shadow-lg"
+          >
+            {isRouteVisible ? "Hide Lines" : "Show Lines"}
+          </AriaButton>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function Home() {
   const [view, setView] = useState<View>("map");
-  const [selectedBleFromUrl, setSelectedBleFromUrl] = useState("");
-
   useEffect(() => {
     const syncView = () => {
       const params = new URL(window.location.href).searchParams;
 
       setView(params.get("view") === "table" ? "table" : "map");
-      setSelectedBleFromUrl(params.get("ble") ?? "");
     };
 
     syncView();
@@ -346,6 +417,8 @@ export default function Home() {
   const devices = bleQuery.data ?? [];
   const [selectedPhoneId, setSelectedPhoneId] = useState("");
   const [activePhoneId, setActivePhoneId] = useState("");
+  const [hasRoute, setHasRoute] = useState(false);
+  const [isRouteVisible, setIsRouteVisible] = useState(false);
 
   const selectedReportsQuery = api.ble.byBleId.useQuery(activePhoneId, {
     enabled: Boolean(activePhoneId),
@@ -372,6 +445,7 @@ export default function Home() {
             type="button"
             onClick={() => {
               window.localStorage.setItem("selectedBleId", row.original.bleId);
+              window.localStorage.removeItem("showBleRoute");
               window.location.href = "/?view=map";
             }}
             className="bg-primary text-primary-foreground hover:bg-primary_hover inline-flex h-8 items-center rounded-lg px-3 text-xs font-semibold"
@@ -406,8 +480,12 @@ export default function Home() {
       setActivePhoneId(selectedBleId);
       setSelectedPhoneId(selectedBleId);
       window.localStorage.removeItem("selectedBleId");
+      setHasRoute(false);
+      setIsRouteVisible(false);
     }
-  }, [selectedBleFromUrl]);
+
+    window.localStorage.removeItem("showBleRoute");
+  }, []);
 
   return (
     <main className="bg-background text-foreground min-h-dvh">
@@ -426,13 +504,24 @@ export default function Home() {
             <div className="flex-1">
               {view === "map" ? (
                 <div className="relative">
-                  <MapPanel devices={selectedDevicesForMap} />
+                  <MapPanel
+                    devices={selectedDevicesForMap}
+                    isRouteVisible={isRouteVisible}
+                    hasRoute={hasRoute}
+                    onToggleRoute={() => setIsRouteVisible((value) => !value)}
+                  />
                   <div className="absolute top-3 left-3 z-[500]">
                     <BleSelector
                       devices={devices}
                       selectedPhoneId={selectedPhoneId}
                       setSelectedPhoneId={setSelectedPhoneId}
-                      onGo={() => setActivePhoneId(selectedPhoneId.trim())}
+                      onGo={() => {
+                        const nextBleId = selectedPhoneId.trim();
+
+                        setActivePhoneId(nextBleId);
+                        setHasRoute(true);
+                        setIsRouteVisible(false);
+                      }}
                     />
                   </div>
                 </div>
