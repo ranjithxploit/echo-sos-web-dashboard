@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   DivIcon as LeafletDivIcon,
   Map as LeafletMap,
+  Layer as LeafletLayer,
   Marker as LeafletMarker,
 } from "leaflet";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -93,6 +94,20 @@ function BleDetails({ reports }: { reports: BleDevice[] }) {
 
   const [latestReport] = reports as [BleDevice, ...BleDevice[]];
 
+  const getReportTone = (index: number, total: number) => {
+    if (total <= 1) {
+      return "bg-red-600/20 text-red-950";
+    }
+
+    const step = Math.max(1, total - 1);
+    const intensity = index / step;
+
+    if (intensity >= 1) return "bg-red-600 text-white";
+    if (intensity >= 0.66) return "bg-red-500 text-white";
+    if (intensity >= 0.33) return "bg-red-400 text-red-950";
+    return "bg-red-200 text-red-950";
+  };
+
   return (
     <div className="mt-2 space-y-1 text-xs">
       <div className="text-foreground flex flex-wrap gap-x-3 gap-y-1">
@@ -114,8 +129,11 @@ function BleDetails({ reports }: { reports: BleDevice[] }) {
       </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1">
-        {reports.map((report) => (
-          <span key={report.id} className="text-muted-foreground">
+        {reports.map((report, index) => (
+          <span
+            key={report.id}
+            className={`rounded-full px-2 py-1 ${getReportTone(index, reports.length)}`}
+          >
             {report.locationOfMobile} ·{" "}
             {new Date(report.capturedAt).toLocaleDateString()}
           </span>
@@ -128,7 +146,11 @@ function BleDetails({ reports }: { reports: BleDevice[] }) {
 function MapPanel({ devices }: { devices: BleDevice[] }) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const lightBaseLayerRef = useRef<LeafletLayer | null>(null);
+  const lightLabelLayerRef = useRef<LeafletLayer | null>(null);
+  const satelliteLayerRef = useRef<LeafletLayer | null>(null);
   const markersRef = useRef<LeafletMarker[]>([]);
+  const [isSatellite, setIsSatellite] = useState(false);
 
   useEffect(() => {
     const container = mapRef.current;
@@ -148,7 +170,7 @@ function MapPanel({ devices }: { devices: BleDevice[] }) {
           attributionControl: false,
         });
 
-        L.tileLayer(
+        lightBaseLayerRef.current = L.tileLayer(
           "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
           {
             subdomains: "abcd",
@@ -156,13 +178,21 @@ function MapPanel({ devices }: { devices: BleDevice[] }) {
           },
         ).addTo(mapInstanceRef.current);
 
-        L.tileLayer(
+        lightLabelLayerRef.current = L.tileLayer(
           "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
           {
             subdomains: "abcd",
             maxZoom: 20,
           },
         ).addTo(mapInstanceRef.current);
+
+        satelliteLayerRef.current = L.tileLayer(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          {
+            maxZoom: 19,
+            attribution: "Tiles \u00a9 Esri",
+          },
+        );
       }
 
       const map = mapInstanceRef.current;
@@ -250,27 +280,66 @@ function MapPanel({ devices }: { devices: BleDevice[] }) {
     };
   }, [devices]);
 
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const lightBase = lightBaseLayerRef.current;
+    const lightLabels = lightLabelLayerRef.current;
+    const satellite = satelliteLayerRef.current;
+
+    if (!map || !lightBase || !lightLabels || !satellite) return;
+
+    if (isSatellite) {
+      if (map.hasLayer(lightBase)) map.removeLayer(lightBase);
+      if (map.hasLayer(lightLabels)) map.removeLayer(lightLabels);
+      if (!map.hasLayer(satellite)) map.addLayer(satellite);
+    } else {
+      if (map.hasLayer(satellite)) map.removeLayer(satellite);
+      if (!map.hasLayer(lightBase)) map.addLayer(lightBase);
+      if (!map.hasLayer(lightLabels)) map.addLayer(lightLabels);
+    }
+  }, [isSatellite]);
+
   return (
-    <div ref={mapRef} className="h-[calc(100dvh-8rem)] min-h-[560px] w-full" />
+    <div className="relative">
+      <div
+        ref={mapRef}
+        className="h-[calc(100dvh-8rem)] min-h-[560px] w-full"
+      />
+
+      <div className="absolute right-3 bottom-3 z-[500] flex flex-col items-end gap-2">
+        {isSatellite && (
+          <div className="bg-background/90 text-foreground rounded-full px-3 py-1 text-xs shadow-lg backdrop-blur">
+            Satellite view enabled
+          </div>
+        )}
+
+        <AriaButton
+          onPress={() => setIsSatellite((value) => !value)}
+          className="bg-background text-foreground border-border hover:bg-muted rounded-full border px-3 py-2 text-xs font-semibold shadow-lg"
+        >
+          {isSatellite ? "Map view" : "Satellite"}
+        </AriaButton>
+      </div>
+    </div>
   );
 }
 
 export default function Home() {
-  const [view, setView] = useState<View>(() =>
-    typeof window !== "undefined" && window.location.hash === "#table"
-      ? "table"
-      : "map",
-  );
+  const [view, setView] = useState<View>("map");
 
   useEffect(() => {
     const syncView = () => {
-      setView(window.location.hash === "#table" ? "table" : "map");
+      setView(
+        new URL(window.location.href).searchParams.get("view") === "table"
+          ? "table"
+          : "map",
+      );
     };
 
     syncView();
-    window.addEventListener("hashchange", syncView);
+    window.addEventListener("popstate", syncView);
 
-    return () => window.removeEventListener("hashchange", syncView);
+    return () => window.removeEventListener("popstate", syncView);
   }, []);
 
   const bleQuery = api.ble.list.useQuery();
@@ -306,8 +375,8 @@ export default function Home() {
   });
 
   const navItems: (NavItemType & { icon: typeof Map01 })[] = [
-    { label: "Map", href: "#map", icon: Map01 },
-    { label: "Table", href: "#table", icon: Rows01 },
+    { label: "Map", href: "/?view=map", icon: Map01 },
+    { label: "Table", href: "/?view=table", icon: Rows01 },
   ];
 
   const selectedDevicesForMap = activePhoneId
@@ -320,7 +389,7 @@ export default function Home() {
         <SidebarNavigationDualTier items={navItems} />
 
         <section className="p-0 sm:p-4 lg:p-8">
-          <div className="bg-card lg:border-border mx-auto flex min-h-dvh max-w-6xl flex-col lg:min-h-[calc(100dvh-4rem)] lg:rounded-3xl lg:border lg:shadow-[0_1px_30px_rgba(15,23,42,0.08)]">
+          <div className="bg-card lg:border-border mx-auto flex min-h-dvh max-w-7xl flex-col lg:min-h-[calc(100dvh-4rem)] lg:rounded-3xl lg:border lg:shadow-[0_1px_30px_rgba(15,23,42,0.08)]">
             <div className="border-border border-b px-5 py-4">
               <h2 className="text-lg font-semibold">
                 {view === "map" ? "Map View" : "Table View"}
