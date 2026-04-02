@@ -84,6 +84,40 @@ function BleSelector({
   );
 }
 
+function PhoneSelector({
+  devices,
+  selectedPhoneId,
+  setSelectedPhoneId,
+}: {
+  devices: BleDevice[];
+  selectedPhoneId: string;
+  setSelectedPhoneId: (value: string) => void;
+}) {
+  const options = useMemo(() => {
+    const ids = new Set(devices.map((device) => device.phoneId));
+
+    return Array.from(ids)
+      .sort()
+      .map((phoneId) => ({ id: phoneId, label: phoneId }));
+  }, [devices]);
+
+  return (
+    <select
+      aria-label="Select Phone ID"
+      className="bg-background text-foreground ring-border h-9 w-[210px] rounded-lg px-3 text-sm ring-1 outline-none"
+      value={selectedPhoneId}
+      onChange={(event) => setSelectedPhoneId(event.target.value)}
+    >
+      <option value="">Phone ID</option>
+      {options.map((option) => (
+        <option key={option.id} value={option.id}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function BleDetails({ reports }: { reports: BleDevice[] }) {
   if (!reports.length) {
     return (
@@ -149,16 +183,31 @@ function BleDetails({ reports }: { reports: BleDevice[] }) {
   );
 }
 
+function HighlightedPhoneSummary({ reports }: { reports: BleDevice[] }) {
+  if (!reports.length) return null;
+
+  const [firstReport] = reports as [BleDevice, ...BleDevice[]];
+
+  return (
+    <div className="text-primary mt-2 text-xs font-semibold">
+      Highlighted phone: {firstReport.phoneId} ({reports.length} report
+      {reports.length === 1 ? "" : "s"})
+    </div>
+  );
+}
+
 function MapPanel({
   devices,
   isRouteVisible,
   hasRoute,
   onToggleRoute,
+  phoneIdFilter,
 }: {
   devices: BleDevice[];
   isRouteVisible: boolean;
   hasRoute: boolean;
   onToggleRoute: () => void;
+  phoneIdFilter: string;
 }) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
@@ -220,10 +269,17 @@ function MapPanel({
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = devices.map((device) => {
         const isStrong = device.strength >= -52;
-        const color = isStrong ? "#22c55e" : "#ef4444";
-        const halo = isStrong
-          ? "rgba(34, 197, 94, 0.35)"
-          : "rgba(239, 68, 68, 0.35)";
+        const isPhoneMatch = !phoneIdFilter || device.phoneId === phoneIdFilter;
+        const color = isPhoneMatch
+          ? isStrong
+            ? "#16a34a"
+            : "#dc2626"
+          : "#94a3b8";
+        const halo = isPhoneMatch
+          ? isStrong
+            ? "rgba(22, 163, 74, 0.35)"
+            : "rgba(220, 38, 38, 0.35)"
+          : "rgba(148, 163, 184, 0.22)";
 
         const markerIcon: LeafletDivIcon = L.divIcon({
           className: "ble-symbol-marker",
@@ -245,6 +301,7 @@ function MapPanel({
         marker.bindTooltip(
           `
             <div class="ble-tooltip__coords">${device.latitude.toFixed(4)}, ${device.longitude.toFixed(4)}</div>
+            <div class="ble-tooltip__coords">Phone ${device.phoneId}</div>
             <div class="ble-tooltip__coords">Accuracy ${device.accuracy.toFixed(1)} m</div>
             <div class="ble-tooltip__strength ble-tooltip__strength--${isStrong ? "strong" : "weak"}">
               Strength ${device.strength} dBm
@@ -346,7 +403,7 @@ function MapPanel({
         container.innerHTML = "";
       }
     };
-  }, [devices, isRouteVisible]);
+  }, [devices, isRouteVisible, phoneIdFilter]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -422,6 +479,7 @@ export default function Home() {
   const devices = bleQuery.data ?? [];
   const [selectedPhoneId, setSelectedPhoneId] = useState("");
   const [activePhoneId, setActivePhoneId] = useState("");
+  const [selectedHighlightPhoneId, setSelectedHighlightPhoneId] = useState("");
   const [hasRoute, setHasRoute] = useState(false);
   const [isRouteVisible, setIsRouteVisible] = useState(false);
 
@@ -496,6 +554,12 @@ export default function Home() {
     window.localStorage.removeItem("showBleRoute");
   }, []);
 
+  const highlightedReports = selectedHighlightPhoneId
+    ? selectedReports.filter(
+        (report) => report.phoneId === selectedHighlightPhoneId,
+      )
+    : [];
+
   return (
     <main className="bg-background text-foreground min-h-dvh">
       <div className="grid min-h-dvh lg:grid-cols-[300px_1fr]">
@@ -508,6 +572,9 @@ export default function Home() {
                 {view === "map" ? "Map View" : "Table View"}
               </h2>
               {view === "map" && <BleDetails reports={selectedReports} />}
+              {view === "map" && (
+                <HighlightedPhoneSummary reports={highlightedReports} />
+              )}
             </div>
 
             <div className="flex-1">
@@ -518,20 +585,30 @@ export default function Home() {
                     isRouteVisible={isRouteVisible}
                     hasRoute={hasRoute}
                     onToggleRoute={() => setIsRouteVisible((value) => !value)}
+                    phoneIdFilter={selectedHighlightPhoneId}
                   />
                   <div className="absolute top-3 left-3 z-[500]">
-                    <BleSelector
-                      devices={devices}
-                      selectedPhoneId={selectedPhoneId}
-                      setSelectedPhoneId={setSelectedPhoneId}
-                      onGo={() => {
-                        const nextBleId = selectedPhoneId.trim();
+                    <div className="flex flex-col gap-2">
+                      <BleSelector
+                        devices={devices}
+                        selectedPhoneId={selectedPhoneId}
+                        setSelectedPhoneId={setSelectedPhoneId}
+                        onGo={() => {
+                          const nextBleId = selectedPhoneId.trim();
 
-                        setActivePhoneId(nextBleId);
-                        setHasRoute(true);
-                        setIsRouteVisible(false);
-                      }}
-                    />
+                          setActivePhoneId(nextBleId);
+                          setHasRoute(true);
+                          setIsRouteVisible(false);
+                        }}
+                      />
+                      <PhoneSelector
+                        devices={
+                          selectedReports.length ? selectedReports : devices
+                        }
+                        selectedPhoneId={selectedHighlightPhoneId}
+                        setSelectedPhoneId={setSelectedHighlightPhoneId}
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (

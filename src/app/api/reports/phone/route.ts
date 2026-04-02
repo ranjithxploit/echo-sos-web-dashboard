@@ -7,6 +7,57 @@ import { withCors } from "~/server/cors";
 
 export const dynamic = "force-dynamic";
 
+const NTFY_TOPICS = [
+  "12345678-1234-1234-1234-1234567890a1",
+  "12345678-1234-1234-1234-1234567890a2",
+  "12345678-1234-1234-1234-1234567890a3",
+];
+
+async function sendNtfyNotification(
+  phoneId: string,
+  report: {
+    bleId: string;
+    phoneId: string;
+    capturedAt: Date;
+    accuracy: number;
+    strength: number;
+    latitude: number;
+    longitude: number;
+    id?: number;
+  },
+) {
+  console.log(`[ntfy] Sending notification for phone: ${phoneId}`);
+
+  const gmapLink = `https://www.google.com/maps?q=${report.latitude},${report.longitude}`;
+  const message = `BLE Report Received
+BLE: ${report.bleId}
+Phone: ${report.phoneId}
+Accuracy: ${report.accuracy}m
+Signal: ${report.strength} dBm
+Location: ${report.latitude}, ${report.longitude}
+[Map](${gmapLink})`;
+
+  console.log(`[ntfy] Message: ${message}`);
+
+  for (const topic of NTFY_TOPICS) {
+    console.log(`[ntfy] Sending to URL: https://ntfy.sh/${topic}`);
+
+    try {
+      await fetch(`https://ntfy.sh/${topic}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/markdown",
+          Markdown: "yes",
+        },
+        body: message,
+      });
+      console.log(`[ntfy] Notification sent successfully to ${topic}`);
+    } catch (err) {
+      console.error(`[ntfy] notification failed for ${topic}:`, err);
+    }
+  }
+}
+
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: withCors() });
 }
@@ -120,6 +171,10 @@ export async function POST(request: Request) {
     }
 
     const [inserted] = await db.insert(bleDevices).values(payload).returning();
+
+    if (inserted) {
+      void sendNtfyNotification(inserted.phoneId, inserted);
+    }
 
     return NextResponse.json(
       {
